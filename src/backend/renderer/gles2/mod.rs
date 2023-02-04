@@ -1058,17 +1058,16 @@ impl ImportEgl for Gles2Renderer {
             .egl_buffer_contents(buffer)
             .map_err(Gles2Error::EGLBufferAccessError)?;
 
-        let tex = self.import_egl_image(egl.image(0).unwrap(), egl.format == EGLFormat::External, None)?;
+        let tex = self.import_egl_image(egl.image(0).unwrap(), false, None)?;
 
         let texture = Gles2Texture(Rc::new(Gles2TextureInternal {
             texture: tex,
             texture_kind: match egl.format {
                 EGLFormat::RGB => 1,
-                EGLFormat::RGBA => 0,
-                EGLFormat::External => 2,
+                EGLFormat::RGBA | EGLFormat::External => 0,
                 _ => unreachable!("EGLBuffer currenly does not expose multi-planar buffers to us"),
             },
-            is_external: egl.format == EGLFormat::External,
+            is_external: false,
             y_inverted: egl.y_inverted,
             size: egl.size,
             egl_images: Some(egl.into_images()),
@@ -1163,11 +1162,7 @@ impl Gles2Renderer {
             self.gl.GenTextures(1, &mut tex);
             tex
         });
-        let target = if is_external {
-            ffi::TEXTURE_EXTERNAL_OES
-        } else {
-            ffi::TEXTURE_2D
-        };
+        let target = ffi::TEXTURE_2D;
         unsafe {
             self.gl.BindTexture(target, tex);
             self.gl.EGLImageTargetTexture2DOES(target, image);
@@ -2254,11 +2249,7 @@ impl<'frame> Gles2Frame<'frame> {
         //apply output transformation
         matrix = self.current_projection * matrix;
 
-        let target = if tex.0.is_external {
-            ffi::TEXTURE_EXTERNAL_OES
-        } else {
-            ffi::TEXTURE_2D
-        };
+        let target = ffi::TEXTURE_2D;
 
         // render
         let gl = &self.renderer.gl;
